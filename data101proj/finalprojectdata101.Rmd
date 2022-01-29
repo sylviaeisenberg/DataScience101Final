@@ -1,0 +1,222 @@
+---
+title: "Final Project"
+author: "Sylvia Eisenberg"
+date: "5/13/2021"
+output: html_document
+---
+# Mass Incarceration in the United States
+## Sylvia Eisenberg
+### Data 101, Spring 2021
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("ggplot2")
+library(ggplot2)
+library(maps)
+install.packages("ggforce")
+library(ggforce)
+require(maps)
+install.packages("viridis")
+library(viridis)
+
+```
+
+
+
+
+
+  If a person were to do a cursory search about "mass incarceration", or "prison population in the United States" they would likely find the statistic that a quarter of the world's incarcerated population is in the United States. However, very few resources that cite this shocking statistic provide an answer for it. In this project, I will prove that the United States' high rate of incarceration is not reflective of a more "criminal" society, but rather a history of systemic racism effectuated by the War on Drugs. Dismantling the prison industrial complex is crucial in securing equal rights for all Americans, but especially people of color and those living in low income communities. More than 2 million Americans are disenfranchised and silenced by the American justice system. 
+
+  The United States has the highest rate of incarceration in the world not only because of the policies that vilify drug offenders and prevent rehabilitation, but the systemic racism found in the prison complex.
+  
+  I have previously studied the relationship between prison privatization and mass incarceration. Private prisons rely on free labor from inmates, which leads to longer sentences and stricter terms of parole that make it impossible for inmates to stay out of jail. 
+  
+  In order to prove the United States is not a more "criminal" country, I will analyze two sources from Our World in Data, which model prison population rate per 100,000, and prison population rate versus intentional homicides per 100,000 people. I will then show how the prison system targets Black men and people with drug charges with a data set from the Bureau of Justice Statistics. Finally, I will further prove the inherent racism in prisons with data showing crime and incarceration by state from Kaggle. I will use map graph, a scatter plot, four onion graphs, and a multi-panel line graph.
+  
+## Analysis
+
+
+First, I wanted to compare the United States' rate of incarceration to the rest of the world. I used a Our World in Data data set that showed prison population by 100,000 people. Clearly, the United States is alone in its staggering rate of incarceration.
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(readr)
+
+
+options(scipen = 999) 
+
+prison_population_rate <- read_csv("prison-population-rate.csv")
+
+prison_pop <- select(prison_population_rate, region = Entity, pop_rate)
+
+prison_pop <- prison_pop %>%
+  mutate(region = recode(str_trim(region), "United States" = "USA",
+                            "England and Wales" = "UK",
+                            "Scotland" = "UK",
+                            "Northern Ireland" = "UK",
+                            "Antigua and Barbuda" = "Antigua",
+                            "Democratic Republic of Congo" = "Democratic Republic of the Congo"))
+
+world <- map_data("world")
+
+worldprison <- inner_join(world, prison_pop, by = "region")
+
+world_prison_pop <- ggplot(data = worldprison, mapping = aes(x = long, y = lat, group = group)) + 
+  coord_fixed(1.3) +
+  geom_polygon(aes(fill = pop_rate)) +
+  scale_fill_distiller(palette ="RdBu", direction = -1) + 
+  ggtitle("World Prison Population Rate per 100,000") 
+
+world_prison_pop
+
+```
+
+  
+  Subsequently, I wanted to examine the actual relationship between crime and incarceration in the United States. Using another dataset from Our World in Data, I plotted number of homicides per 100,000 against number of incarcerated individuals per 100,000. The United States is an obvious outlier with its number of homicides hovering somewhere around 5 versus the 655 incarcerated individuals. Obviously there is not a direct relationship between homicide rate and incarceration rate, as many other countries on the graph do not fit an easy, linear relationship. Nonetheless, I find it disturbing that the two statistics are so drastically different. 
+  
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+
+homicides_rate_vs_prison_population_rate <- read_csv("homicides-rate-vs-prison-population-rate.csv")
+
+homicide_data <- select( homicides_rate_vs_prison_population_rate, Entity, Year, homicides, prison_pop) %>% 
+                  filter(Year >= 2000) %>%
+                  drop_na()%>%
+                  group_by(Entity) %>%
+                  summarise_at(vars(-Year), funs(mean(., na.rm=TRUE)))
+
+ggplot(homicide_data, aes(x=homicides, y=prison_pop)) + geom_point() +
+        annotate(geom="text", x=5.3092776, y=655, label="United States", color="red") +
+                geom_smooth()
+
+```
+  
+  
+  I also wanted to examine prison population trends by crime to further prove it isn't a rise in crime that led to mass incarceration.
+   
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+
+crime_and_incarceration_by_state <- read_csv("crime_and_incarceration_by_state.csv")
+
+tidy_crime <- crime_and_incarceration_by_state %>%
+  pivot_longer(c( violent_crime_total, murder_manslaughter, rape_legacy, robbery, agg_assault, property_crime_total, burglary, larceny, vehicle_theft), names_to = "crime", values_to = "pop")
+
+crime_small <- tidy_crime %>% 
+  filter(crime %in% c("violent_crime_total", "murder_manslaughter", "rape_legacy", "robbery", "agg_assault", "property_crime_total", "burglary", "larceny", "vehicle_theft"))
+
+crime_small %>%
+  ggplot( aes(x=year, y=pop, group=crime)) +
+    geom_line() +
+    scale_fill_viridis(discrete = TRUE) +
+    theme(legend.position="none") +
+    ggtitle("Prison Population Trends by Crime") +
+    theme(
+      legend.position="none",
+      panel.spacing = unit(0, "lines"),
+      strip.text.x = element_text(size = 8),
+      plot.title = element_text(size=13)
+    ) +
+    facet_wrap(~crime, scale="free_y")
+
+```
+  
+  
+  Finally, I used a dataset from the Bureau of Justice Statistics (BJS) to examine the relationship between recidivism and race, as well as how drug charges effect recidivism. It is important to note that white men who were convicted of any crime had the lowest rates of recidivism and still had almost 25% reimprisonment. While race and crime exacerbates the effects of incarceration, around 1 in 5 individuals will be reimprisoned after three years. 
+  However, Black men convicted of any crime were more likely to be rearrested than white men, which is of course due to racial bias from police. Because Black men are more likely to be rearrested, they were also more likely to be readjudicated, reconvicted, etc. This graphs prove a serious issue with recidivism in the United States. Prisons in the United States place little to no emphasis on rehabilitation, which results in incarcerated individuals unable to escape the cycle of reimprisonment. Black and White men convicted of drug possession had higher rates of incarceration still. 
+  
+  
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+
+
+bmr <- data.frame(
+   BMR = c (1:1), 
+   Rs = c("Rearrested (74%)","Readjudicated (60.8%)","Reconvicted (52.3%)","Reincarcerated (45.2%)","Reimprisoned (30.7%)"),
+   pct = c(0.740, 0.608, 0.523, 0.452, 0.307)
+)
+
+ggplot() +
+  geom_circle(aes(x0 = BMR, y0 = pct, r = pct, fill = pct), data = bmr) +
+  theme(legend.position = "none", axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text = element_blank(), axis.ticks = element_blank()) +
+  coord_fixed() +
+  geom_text(fontface = "bold", color="white",aes(x=BMR,y=pct*1.8, label=Rs), data=bmr) +
+  ggtitle("Recidivism Rates for Black Men")
+
+
+```
+
+```{r  echo=FALSE,warning=FALSE,message=FALSE}
+wmr <- data.frame(
+   WMR = c (1:1), 
+   Rs = c("Rearrested (63.7%)","Readjudicated (49.6%)","Reconvicted (44.2%)","Reincarcerated (35%)","Reimprisoned (23.8%)"),
+   pct = c(0.637, 0.496, 0.442, 0.350, 0.238)
+)
+
+ggplot() +
+  geom_circle(aes(x0 = WMR, y0 = pct, r = pct, fill = pct), data = wmr) +
+  theme(legend.position = "none", axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text = element_blank(), axis.ticks = element_blank()) +
+  coord_fixed() +
+  geom_text(fontface = "bold", color="white",aes(x=WMR,y=pct*1.8, label=Rs), data=wmr) +
+  ggtitle("Recidivism Rates for White Men")
+
+```
+  
+  
+  
+```{r  echo=FALSE,warning=FALSE,message=FALSE}
+bmd <- data.frame(
+   BMD = c (1:1), 
+   Rs = c("Rearrested (76.8%)","Readjudicated (63.2%)","Reconvicted (56.8%)","Reincarcerated (49.6%)","Reimprisoned (29.7%)"),
+   pct = c(0.768, 0.632, 0.568, 0.496, 0.297)
+)
+
+ggplot() +
+  geom_circle(aes(x0 = BMD, y0 = pct, r = pct, fill = pct), data = bmd) +
+  theme(legend.position = "none", axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text = element_blank(), axis.ticks = element_blank()) +
+  coord_fixed() +
+  geom_text(fontface = "bold", color="white",aes(x=BMD,y=pct*1.8, label=Rs), data=bmd) +
+  ggtitle("Recidivism Rates for Black Men with Drug Possession Sentencing")
+```
+  
+  
+```{r  echo=FALSE,warning=FALSE,message=FALSE}
+wmd <- data.frame(
+   WMD = c (1:1), 
+   Rs = c("Rearrested (64.7%)","Readjudicated (51.9%)","Reconvicted (48.7%)","Reincarcerated (37.2%)","Reimprisoned (25.2%)"),
+   pct = c(0.647, 0.519, 0.487, 0.372, 0.252)
+)
+
+ggplot() +
+  geom_circle(aes(x0 = WMD, y0 = pct, r = pct, fill = pct), data = wmd) +
+  theme(legend.position = "none", axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text = element_blank(), axis.ticks = element_blank()) +
+  coord_fixed() +
+  geom_text(fontface = "bold", color="white",aes(x=WMD,y=pct*1.8, label=Rs), data=wmd) +
+  ggtitle("Recidivism Rates for White Men with Drug Possession Sentencing")
+
+```
+  
+ 
+ 
+ 
+ 
+ The United States prison system aims to punish and suppress, not rehabilitate or actually prevent crime. It is important to debunk claims that rising crime has led to high prison populations because it shifts blame from the justice system onto the victims. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+## Bibliography
+
+
+FBI Uniform Crime Reporting Program. “Crime and Incarceration in the United States.” Kaggle, Bureau of Justice Statistics, 12 Oct. 2018, www.kaggle.com/christophercorrea/prisoners-and-crime-in-united-states.
+
+“Homicides Rate vs. Prison Population Rate.” Our World in Data, World Bank, 2018, ourworldindata.org/grapher/homicides-rate-vs-prison-population-rate?country=ABW%7EBHS%7EBRB%7EBLZ%7EBMU%7ECAN%7ECYM%7ECRI%7ECUB%7EDOM%7ESLV%7EGRL%7EGRD%7EGTM%7EHND%7EJAM%7EMEX%7ENIC%7EPAN%7EPRI%7ELCA%7ETTO%7EUSA.
+
+Langan, Patrick, and David Levin. “Bureau of Justice Statistics (BJS) - Data Analysis Tools - Prisoner Recidivism Analysis Tool 1994–1997.” Bureau of Justice Statistics (BJS), BJS Special Bulletin, June 2002, www.bjs.gov/index.cfm?ty=datool&surl=/recidivism/index.cfm#.
+
+“Prison Population Rate: Prisoners per 100,000.” Our World in Data, 2018, ourworldindata.org/grapher/prison-population-rate.
+
+
